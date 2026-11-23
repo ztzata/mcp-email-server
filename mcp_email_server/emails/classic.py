@@ -115,8 +115,30 @@ _HIGH_BIT_OCTET = re.compile(rb"[\x80-\xff]")
 
 # ===================新增ics日历文件辅助函数=============
 def _ics_unescape(value: str) -> str:
-    """Decode escaped characters used in iCalendar text values."""
-    return value.replace("\\n", "\n").replace("\\N", "\n").replace("\\,", ",").replace("\\;", ";").replace("\\\\", "\\")
+    """Decode iCalendar text escapes in a single pass."""
+    replacements = {
+        "n": "\n",
+        "N": "\n",
+        ",": ",",
+        ";": ";",
+        "\\": "\\",
+    }
+
+    result = []
+    i = 0
+
+    while i < len(value):
+        if value[i] == "\\" and i + 1 < len(value):
+            escaped = value[i + 1]
+            if escaped in replacements:
+                result.append(replacements[escaped])
+                i += 2
+                continue
+
+        result.append(value[i])
+        i += 1
+
+    return "".join(result)
 
 
 def _parse_ics_datetime(value: str, tzid: str = "") -> str:
@@ -149,7 +171,7 @@ def _parse_ics_part(part) -> str:
             return ""
     else:
         charset = part.get_content_charset() or "utf-8"
-        content = payload.decode(charset, errors="replace")
+        content = charsets.decode_text(payload, charset)
 
     # RFC 5545: unfold lines that continue with a space or tab.
     content = re.sub(r"\r?\n[ \t]", "", content)
